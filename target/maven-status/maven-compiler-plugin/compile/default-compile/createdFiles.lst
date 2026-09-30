@@ -1,0 +1,4 @@
+com\moveinsync\fleetbilling\controller\AuthController.class
+com\moveinsync\fleetbilling\security\JwtService.class
+com\moveinsync\fleetbilling\security\SecurityConfig.class
+com\moveinsync\fleetbilling\security\JwtFilter.class
