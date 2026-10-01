@@ -1,5 +1,83 @@
 const API_BASE = "http://localhost:8080";
 
+// =====================================================
+// JWT
+// =====================================================
+
+let jwtToken = "";
+
+async function getJwtToken() {
+
+    try {
+
+        const response = await fetch(
+            `${API_BASE}/auth/token`,
+            {
+                method: "POST"
+            }
+        );
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Unable to generate security token."
+            );
+
+        }
+
+        jwtToken = await response.text();
+
+        console.log(
+            "JWT token generated successfully."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "JWT Error:",
+            error
+        );
+
+        showError(
+            "Unable to initialize API security. Please restart the backend."
+        );
+
+    }
+}
+
+
+// =====================================================
+// AUTHENTICATED API FETCH
+// =====================================================
+
+async function apiFetch(url, options = {}) {
+
+    // If token hasn't been generated yet,
+    // generate it automatically.
+    if (!jwtToken) {
+
+        await getJwtToken();
+
+    }
+
+    options.headers = {
+
+        ...(options.headers || {}),
+
+        "Authorization":
+            `Bearer ${jwtToken}`,
+
+        "Content-Type":
+            "application/json"
+
+    };
+
+    return fetch(
+        url,
+        options
+    );
+}
+
 
 // =====================================================
 // ELEMENTS
@@ -85,6 +163,10 @@ document.addEventListener(
             String(today.getMonth() + 1)
                 .padStart(2, "0");
 
+        // Generate JWT automatically
+        await getJwtToken();
+
+        // Load vehicles using JWT
         await loadVehicles();
 
         resetAllDynamicSections();
@@ -102,13 +184,17 @@ async function loadVehicles() {
     try {
 
         const response =
-            await fetch(
+            await apiFetch(
                 `${API_BASE}/api/vehicles`
             );
 
         if (!response.ok) {
 
+            const text =
+                await response.text();
+
             throw new Error(
+                text ||
                 "Unable to load vehicles."
             );
 
@@ -162,6 +248,7 @@ vehicleId.addEventListener(
         } else {
 
             chargingModel.disabled = true;
+
             chargingModel.value = "";
 
         }
@@ -190,7 +277,9 @@ function handleChargingModel() {
         chargingModel.value;
 
     if (!model) {
+
         return;
+
     }
 
 
@@ -301,6 +390,7 @@ function handlePricingType() {
         ) {
 
             addSlab();
+
             addSlab();
 
         }
@@ -584,11 +674,13 @@ function setupPricingPeriod(period) {
                     ".period-slabs-container"
                 );
 
+
             if (
                 container.children.length === 0
             ) {
 
                 addPeriodSlab(period);
+
                 addPeriodSlab(period);
 
             }
@@ -737,7 +829,9 @@ document.addEventListener(
 function checkPricingCompletion() {
 
     if (!vehicleId.value) {
+
         return;
+
     }
 
     const model =
@@ -1111,7 +1205,9 @@ function validSlabs() {
 
 
     if (rows.length === 0) {
+
         return false;
+
     }
 
 
@@ -1167,7 +1263,9 @@ function validSlabs() {
 function validatePricingPeriodsFrontend() {
 
     if (!rateChange.checked) {
+
         return true;
+
     }
 
 
@@ -1235,6 +1333,7 @@ function validatePricingPeriodsFrontend() {
                         ".period-to"
                     ).value;
 
+
                 if (!from || !to) {
 
                     throw new Error(
@@ -1245,13 +1344,17 @@ function validatePricingPeriodsFrontend() {
 
 
                 return {
+
                     element: period,
+
                     from: new Date(
                         `${from}T00:00:00`
                     ),
+
                     to: new Date(
                         `${to}T00:00:00`
                     )
+
                 };
 
             })
@@ -1329,6 +1432,7 @@ function validatePricingPeriodsFrontend() {
                     period.element.querySelector(
                         ".period-per-km-rate"
                     ).value;
+
 
                 if (
                     rate === "" ||
@@ -1421,6 +1525,7 @@ function validatePricingPeriodsFrontend() {
                     ".period-per-trip-rate"
                 ).value;
 
+
             if (
                 rate === "" ||
                 Number(rate) <= 0
@@ -1458,7 +1563,9 @@ function validatePricingPeriodsFrontend() {
 function collectPricingPeriods() {
 
     if (!rateChange.checked) {
+
         return [];
+
     }
 
 
@@ -1553,6 +1660,7 @@ function collectPricingPeriods() {
                                 row.querySelector(
                                     ".period-slab-rate"
                                 ).value;
+
 
                             return {
 
@@ -1856,6 +1964,14 @@ async function calculateBill() {
 
     try {
 
+        // Make sure JWT exists
+        if (!jwtToken) {
+
+            await getJwtToken();
+
+        }
+
+
         const payload =
             buildPayload();
 
@@ -1879,15 +1995,10 @@ async function calculateBill() {
 
 
         const response =
-            await fetch(
+            await apiFetch(
                 `${API_BASE}/api/billing/run`,
                 {
                     method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
 
                     body:
                         JSON.stringify(
@@ -1950,6 +2061,7 @@ async function calculateBill() {
                 "calculateBtn"
             );
 
+
         button.disabled = false;
 
         button.textContent =
@@ -1968,6 +2080,50 @@ function displayResult(data) {
 
     resultSection.style.display =
         "block";
+
+
+    // -----------------------------------------
+    // ALREADY CALCULATED WARNING
+    // -----------------------------------------
+
+    const warning =
+        document.getElementById(
+            "alreadyCalculatedWarning"
+        );
+
+    const message =
+        document.getElementById(
+            "alreadyCalculatedMessage"
+        );
+
+
+    if (
+        warning &&
+        message
+    ) {
+
+        if (
+            data.alreadyCalculated === true
+        ) {
+
+            warning.style.display =
+                "block";
+
+            message.textContent =
+                `This vehicle's monthly bill has already been calculated for ${data.billingMonth}. ` +
+                `The following bill is retrieved from the database.`;
+
+        } else {
+
+            warning.style.display =
+                "none";
+
+            message.textContent =
+                "";
+
+        }
+
+    }
 
 
     document.getElementById(

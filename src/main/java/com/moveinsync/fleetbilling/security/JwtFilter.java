@@ -30,8 +30,12 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // Auth endpoint does not require JWT
-        if (request.getRequestURI().startsWith("/auth/")) {
+        String uri = request.getRequestURI();
+
+        // Frontend files and auth endpoint do not require JWT
+        if (uri.startsWith("/auth/")
+                || !uri.startsWith("/api/")) {
+
             filterChain.doFilter(request, response);
             return;
         }
